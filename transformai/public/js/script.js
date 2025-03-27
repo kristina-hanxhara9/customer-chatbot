@@ -255,8 +255,38 @@ document.addEventListener('DOMContentLoaded', function() {
         custom: 'Custom hours'
     };
     
+    // Function to show current niche services - NEW FUNCTION
+    function showCurrentNicheServices() {
+        console.log('Showing services for niche:', currentNiche);
+        
+        // Hide all tag containers first
+        document.querySelectorAll('.tag-container').forEach(container => {
+            container.classList.add('d-none');
+        });
+        
+        // Show the ones for current niche
+        const servicesContainer = document.getElementById(`${currentNiche}-services`);
+        const featuresContainer = document.getElementById(`${currentNiche}-features`);
+        
+        if (servicesContainer) {
+            servicesContainer.classList.remove('d-none');
+            console.log('Services container found and shown');
+        } else {
+            console.warn(`Services container for ${currentNiche} not found`);
+        }
+        
+        if (featuresContainer) {
+            featuresContainer.classList.remove('d-none');
+            console.log('Features container found and shown');
+        } else {
+            console.warn(`Features container for ${currentNiche} not found`);
+        }
+    }
+    
     // Function to navigate between steps
     function navigateToStep(stepNumber) {
+        console.log('Navigating to step:', stepNumber);
+        
         // Hide all step contents
         stepContents.forEach(content => {
             content.classList.remove('active');
@@ -284,6 +314,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update current step
         currentStep = stepNumber;
+        
+        // If navigating to step 3 (Services), ensure services are visible
+        if (stepNumber === 3) {
+            showCurrentNicheServices();
+        }
     }
     
     // Function to toggle service/feature selection
@@ -348,6 +383,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Call init function to set up event handlers
     initServiceTags();
     
+    // Make dental services visible by default - NEW CODE
+    document.addEventListener('DOMContentLoaded', function() {
+        // Make sure default industry (dental) services are visible
+        document.getElementById('dental-services').classList.remove('d-none');
+        document.getElementById('dental-features').classList.remove('d-none');
+    });
+    
     // Function to generate the AI prompt based on selected options
     function generateAIPrompt() {
         const name = businessNameInput.value || businessName;
@@ -388,22 +430,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Communication styles
         let communicationStyles = [];
-        if (document.getElementById('check-concise').checked) {
+        if (document.getElementById('check-concise') && document.getElementById('check-concise').checked) {
             communicationStyles.push("be concise in your responses");
         }
-        if (document.getElementById('check-questions').checked) {
+        if (document.getElementById('check-questions') && document.getElementById('check-questions').checked) {
             communicationStyles.push("ask follow-up questions when appropriate");
         }
-        if (document.getElementById('check-informative').checked) {
+        if (document.getElementById('check-informative') && document.getElementById('check-informative').checked) {
             communicationStyles.push("provide detailed information when needed");
         }
-        if (document.getElementById('check-empathetic').checked) {
+        if (document.getElementById('check-empathetic') && document.getElementById('check-empathetic').checked) {
             communicationStyles.push("show empathy when customers express concerns");
         }
         
         // Knowledge focus
-        const knowledgeFocus = document.getElementById('knowledge-focus').value;
         let focusText = "";
+        const knowledgeFocus = document.getElementById('knowledge-focus') ? 
+                              document.getElementById('knowledge-focus').value : "balanced";
         
         if (knowledgeFocus === "business") {
             focusText = "Focus primarily on information about the business, its services, and operations.";
@@ -460,8 +503,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to update the current prompt preview
     function updatePromptPreview() {
         const prompt = generateAIPrompt();
-        document.querySelector('.current-prompt').textContent = prompt;
-        document.getElementById('custom-prompt').value = prompt;
+        if (document.querySelector('.current-prompt')) {
+            document.querySelector('.current-prompt').textContent = prompt;
+        }
+        if (document.getElementById('custom-prompt')) {
+            document.getElementById('custom-prompt').value = prompt;
+        }
     }
     
     // Function to add a message to the chat
@@ -638,6 +685,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Industry selection
     nicheCards.forEach(card => {
         card.addEventListener('click', function() {
+            console.log('Industry selected:', this.dataset.niche);
+            
             // Remove active class from all cards
             nicheCards.forEach(c => c.classList.remove('active'));
             
@@ -720,268 +769,281 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Advanced prompt toggle
-    checkAdvanced.addEventListener('change', function() {
-        if (this.checked) {
-            advancedPrompt.classList.add('show');
-            document.getElementById('custom-prompt').value = generateAIPrompt();
-        } else {
-            advancedPrompt.classList.remove('show');
-        }
-    });
+    if (checkAdvanced) {
+        checkAdvanced.addEventListener('change', function() {
+            if (this.checked) {
+                advancedPrompt.classList.add('show');
+                document.getElementById('custom-prompt').value = generateAIPrompt();
+            } else {
+                advancedPrompt.classList.remove('show');
+            }
+        });
+    }
     
     // Communication style checkboxes
     document.querySelectorAll('#check-concise, #check-questions, #check-informative, #check-empathetic').forEach(checkbox => {
-        checkbox.addEventListener('change', updatePromptPreview);
+        if (checkbox) {
+            checkbox.addEventListener('change', updatePromptPreview);
+        }
     });
     
     // Knowledge focus dropdown
-    document.getElementById('knowledge-focus').addEventListener('change', updatePromptPreview);
+    if (document.getElementById('knowledge-focus')) {
+        document.getElementById('knowledge-focus').addEventListener('change', updatePromptPreview);
+    }
     
     // Update prompt button
-    updatePromptButton.addEventListener('click', function() {
-        const customPrompt = document.getElementById('custom-prompt').value;
-        document.querySelector('.current-prompt').textContent = customPrompt;
-    });
+    if (updatePromptButton) {
+        updatePromptButton.addEventListener('click', function() {
+            const customPrompt = document.getElementById('custom-prompt').value;
+            document.querySelector('.current-prompt').textContent = customPrompt;
+        });
+    }
     
     // Business details inputs
-    businessNameInput.addEventListener('input', function() {
-        businessName = this.value;
-        updatePromptPreview();
-    });
+    if (businessNameInput) {
+        businessNameInput.addEventListener('input', function() {
+            businessName = this.value;
+            updatePromptPreview();
+        });
+    }
     
-    businessDescriptionInput.addEventListener('input', function() {
-        businessDescription = this.value;
-        updatePromptPreview();
-    });
+    if (businessDescriptionInput) {
+        businessDescriptionInput.addEventListener('input', function() {
+            businessDescription = this.value;
+            updatePromptPreview();
+        });
+    }
     
-    businessLocationInput.addEventListener('input', function() {
-        businessLocation = this.value;
-    });
+    if (businessLocationInput) {
+        businessLocationInput.addEventListener('input', function() {
+            businessLocation = this.value;
+        });
+    }
     
     // Launch chatbot button
-    launchButton.addEventListener('click', function() {
-        // Reset conversation history
-        conversationHistory = [];
-        
-        // Update welcome message based on current settings
-        const name = businessNameInput.value || businessName;
-        let services = [];
-        
-        selectedServices.forEach(serviceId => {
-            const industry = industryData[currentNiche];
-            if (industry) {
-                const service = industry.services.find(s => s.id === serviceId);
-                if (service) {
-                    services.push(service.name.toLowerCase());
+    if (launchButton) {
+        launchButton.addEventListener('click', function() {
+            // Reset conversation history
+            conversationHistory = [];
+            
+            // Update welcome message based on current settings
+            const name = businessNameInput.value || businessName;
+            let services = [];
+            
+            selectedServices.forEach(serviceId => {
+                const industry = industryData[currentNiche];
+                if (industry) {
+                    const service = industry.services.find(s => s.id === serviceId);
+                    if (service) {
+                        services.push(service.name.toLowerCase());
+                    }
                 }
-            }
-        });
-        
-        const servicesText = services.length > 0 ? 
-            `questions about our services like ${services.slice(0, 2).join(' or ')}` : 
-            'questions about our services';
-        
-        const welcomeText = `Hi there! I'm your ${getIndustryName(currentNiche)} assistant for ${name}. How can I help you today? Whether you're looking to schedule an appointment, have ${servicesText}, or need information about our business hours (${hoursConfigs[businessHours]}), I'm here to assist!`;
-        
-        welcomeMessage.textContent = welcomeText;
-        
-        // Add welcome message to conversation history
-        conversationHistory.push({
-            role: 'assistant',
-            content: welcomeText
-        });
-        
-        // Update chat title and business panel
-        chatTitle.textContent = `${name} AI Assistant`;
-        businessPanelName.textContent = name;
-        
-        // Update business info panel
-        aboutText.textContent = businessDescriptionInput.value || businessDescription;
-        
-        // Update services list
-        servicesList.innerHTML = '';
-        selectedServices.forEach(serviceId => {
-            const industry = industryData[currentNiche];
-            if (industry) {
-                const service = industry.services.find(s => s.id === serviceId);
-                if (service) {
-                    const li = document.createElement('li');
-                    li.textContent = service.name;
-                    servicesList.appendChild(li);
+            });
+            
+            const servicesText = services.length > 0 ? 
+                `questions about our services like ${services.slice(0, 2).join(' or ')}` : 
+                'questions about our services';
+            
+            const welcomeText = `Hi there! I'm your ${getIndustryName(currentNiche)} assistant for ${name}. How can I help you today? Whether you're looking to schedule an appointment, have ${servicesText}, or need information about our business hours (${hoursConfigs[businessHours]}), I'm here to assist!`;
+            
+            welcomeMessage.textContent = welcomeText;
+            
+            // Add welcome message to conversation history
+            conversationHistory.push({
+                role: 'assistant',
+                content: welcomeText
+            });
+            
+            // Update chat title and business panel
+            chatTitle.textContent = `${name} AI Assistant`;
+            businessPanelName.textContent = name;
+            
+            // Update business info panel
+            aboutText.textContent = businessDescriptionInput.value || businessDescription;
+            
+            // Update services list
+            servicesList.innerHTML = '';
+            selectedServices.forEach(serviceId => {
+                const industry = industryData[currentNiche];
+                if (industry) {
+                    const service = industry.services.find(s => s.id === serviceId);
+                    if (service) {
+                        const li = document.createElement('li');
+                        li.textContent = service.name;
+                        servicesList.appendChild(li);
+                    }
                 }
-            }
-        });
-        
-        // Update features list
-        featuresList.innerHTML = '';
-        selectedFeatures.forEach(featureId => {
-            const industry = industryData[currentNiche];
-            if (industry) {
-                const feature = industry.features.find(f => f.id === featureId);
-                if (feature) {
-                    const li = document.createElement('li');
-                    li.textContent = feature.name;
-                    featuresList.appendChild(li);
+            });
+            
+            // Update features list
+            featuresList.innerHTML = '';
+            selectedFeatures.forEach(featureId => {
+                const industry = industryData[currentNiche];
+                if (industry) {
+                    const feature = industry.features.find(f => f.id === featureId);
+                    if (feature) {
+                        const li = document.createElement('li');
+                        li.textContent = feature.name;
+                        featuresList.appendChild(li);
+                    }
                 }
-            }
+            });
+            
+            // Update hours and location
+            hoursText.textContent = hoursConfigs[businessHours];
+            locationText.textContent = businessLocationInput.value || businessLocation;
+            
+            // Switch to chat section
+            setupSection.style.display = 'none';
+            chatSection.style.display = 'block';
+            
+            // Focus on input
+            userInput.focus();
         });
-        
-        // Update hours and location
-        hoursText.textContent = hoursConfigs[businessHours];
-        locationText.textContent = businessLocationInput.value || businessLocation;
-        
-        // Switch to chat section
-        setupSection.style.display = 'none';
-        chatSection.style.display = 'block';
-        
-        // Focus on input
-        userInput.focus();
-    });
+    }
     
     // Back to setup button
-    backToSetupButton.addEventListener('click', function() {
-        setupSection.style.display = 'block';
-        chatSection.style.display = 'none';
-        
-        // Clear chat messages except the welcome message
-        const messages = chatMessages.querySelectorAll('.message:not(:first-child)');
-        messages.forEach(message => message.remove());
-        
-        // Reset conversation history
-        conversationHistory = [{
-            role: 'assistant',
-            content: welcomeMessage.textContent
-        }];
-    });
+    if (backToSetupButton) {
+        backToSetupButton.addEventListener('click', function() {
+            setupSection.style.display = 'block';
+            chatSection.style.display = 'none';
+            
+            // Clear chat messages except the welcome message
+            const messages = chatMessages.querySelectorAll('.message:not(:first-child)');
+            messages.forEach(message => message.remove());
+            
+            // Reset conversation history
+            conversationHistory = [{
+                role: 'assistant',
+                content: welcomeMessage.textContent
+            }];
+        });
+    }
     
     // Send message button
-    sendButton.addEventListener('click', async function() {
-        const message = userInput.value.trim();
-        if (message) {
-            // Add user message to chat
-            addMessage(message, true);
-            
-            // Clear input
-            userInput.value = '';
-            
-            // Show typing indicator
-            showTypingIndicator();
-            
-            // Get AI response
-            const response = await getAIResponse(message);
-            
-            // Hide typing indicator
-            hideTypingIndicator();
-            
-            // Add AI response to chat if not null (prevents duplicate responses)
-            if (response !== null) {
-                addMessage(response);
+    if (sendButton) {
+        sendButton.addEventListener('click', async function() {
+            const message = userInput.value.trim();
+            if (message) {
+                // Add user message to chat
+                addMessage(message, true);
+                
+                // Clear input
+                userInput.value = '';
+                
+                // Show typing indicator
+                showTypingIndicator();
+                
+                // Get AI response
+                const response = await getAIResponse(message);
+                
+                // Hide typing indicator
+                hideTypingIndicator();
+                
+                // Add AI response to chat if not null (prevents duplicate responses)
+                if (response !== null) {
+                    addMessage(response);
+                }
             }
-        }
-    });
+        });
+    }
     
     // Send message on Enter key
-    userInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendButton.click();
-        }
-    });
+    if (userInput) {
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+    }
     
     // Add new service functionality
-    saveServiceButton.addEventListener('click', function() {
-        const newServiceName = newServiceInput.value.trim();
-        if (newServiceName) {
-            // Create unique ID
-            const newId = 'custom-' + Date.now();
-            
-            // Create new tag
-            const newTag = document.createElement('div');
-            newTag.className = 'service-tag selected';
-            newTag.dataset.tag = newId;
-            newTag.innerHTML = `<i class="fas fa-check-circle"></i> ${newServiceName}`;
-            
-            // Add click event
-            newTag.addEventListener('click', function() {
-                toggleSelection(this);
-                updateSelectedServices();
+    if (saveServiceButton) {
+        saveServiceButton.addEventListener('click', function() {
+            const newServiceName = newServiceInput.value.trim();
+            if (newServiceName) {
+                // Create unique ID
+                const newId = 'custom-' + Date.now();
+                
+                // Create new tag
+                const newTag = document.createElement('div');
+                newTag.className = 'service-tag selected';
+                newTag.dataset.tag = newId;
+                newTag.innerHTML = `<i class="fas fa-check-circle"></i> ${newServiceName}`;
+                
+                // Add click event
+                newTag.addEventListener('click', function() {
+                    toggleSelection(this);
+                    updateSelectedServices();
+                    updatePromptPreview();
+                });
+                
+                // Add to container before the "Add Service" button
+                const addButton = document.querySelector(`#${currentNiche}-services .add-new-tag`);
+                addButton.parentNode.insertBefore(newTag, addButton);
+                
+                // Add to selected services
+                selectedServices.push(newId);
+                
+                // Add to industry data
+                if (industryData[currentNiche]) {
+                    industryData[currentNiche].services.push({ id: newId, name: newServiceName });
+                }
+                
+                // Update prompt
                 updatePromptPreview();
-            });
-            
-            // Add to container before the "Add Service" button
-            const addButton = document.querySelector(`#${currentNiche}-services .add-new-tag`);
-            addButton.parentNode.insertBefore(newTag, addButton);
-            
-            // Add to selected services
-            selectedServices.push(newId);
-            
-            // Add to industry data
-            if (industryData[currentNiche]) {
-                industryData[currentNiche].services.push({ id: newId, name: newServiceName });
+                
+                // Clear input
+                newServiceInput.value = '';
             }
-            
-            // Update prompt
-            updatePromptPreview();
-            
-            // Clear input
-            newServiceInput.value = '';
-        }
-    });
+        });
+    }
     
     // Add new feature functionality
-    saveFeatureButton.addEventListener('click', function() {
-        const newFeatureName = newFeatureInput.value.trim();
-        if (newFeatureName) {
-            // Create unique ID
-            const newId = 'custom-' + Date.now();
-            
-            // Create new tag
-            const newTag = document.createElement('div');
-            newTag.className = 'service-tag selected';
-            newTag.dataset.tag = newId;
-            newTag.innerHTML = `<i class="fas fa-check-circle"></i> ${newFeatureName}`;
-            
-            // Add click event
-            newTag.addEventListener('click', function() {
-                toggleSelection(this);
-                updateSelectedFeatures();
+    if (saveFeatureButton) {
+        saveFeatureButton.addEventListener('click', function() {
+            const newFeatureName = newFeatureInput.value.trim();
+            if (newFeatureName) {
+                // Create unique ID
+                const newId = 'custom-' + Date.now();
+                
+                // Create new tag
+                const newTag = document.createElement('div');
+                newTag.className = 'service-tag selected';
+                newTag.dataset.tag = newId;
+                newTag.innerHTML = `<i class="fas fa-check-circle"></i> ${newFeatureName}`;
+                
+                // Add click event
+                newTag.addEventListener('click', function() {
+                    toggleSelection(this);
+                    updateSelectedFeatures();
+                    updatePromptPreview();
+                });
+                
+                // Add to container before the "Add Feature" button
+                const addButton = document.querySelector(`#${currentNiche}-features .add-new-tag`);
+                addButton.parentNode.insertBefore(newTag, addButton);
+                
+                // Add to selected features
+                selectedFeatures.push(newId);
+                
+                // Add to industry data
+                if (industryData[currentNiche]) {
+                    industryData[currentNiche].features.push({ id: newId, name: newFeatureName });
+                }
+                
+                // Update prompt
                 updatePromptPreview();
-            });
-            
-            // Add to container before the "Add Feature" button
-            const addButton = document.querySelector(`#${currentNiche}-features .add-new-tag`);
-            addButton.parentNode.insertBefore(newTag, addButton);
-            
-            // Add to selected features
-            selectedFeatures.push(newId);
-            
-            // Add to industry data
-            if (industryData[currentNiche]) {
-                industryData[currentNiche].features.push({ id: newId, name: newFeatureName });
+                
+                // Clear input
+                newFeatureInput.value = '';
             }
-            
-            // Update prompt
-            updatePromptPreview();
-            
-            // Clear input
-            newFeatureInput.value = '';
-        }
-    });
+        });
+    }
     
-    // Widget button functionality
-  //  widgetButton.addEventListener('click', function() {
-   //     if (widgetContainer.style.display === 'block') {
-     //       widgetContainer.style.display = 'none';
-       // } else {
-         //   widgetContainer.style.display = 'block';
-            // In a real implementation, you would update the iframe source to your chatbot URL
-           // document.querySelector('.widget-iframe').src = 'about:blank'; // Placeholder
-       // }
-   // });
-    
-    // Widget close button
-    // widgetClose.addEventListener('click', function() {
-    //    widgetContainer.style.display = 'none';
-    //});
+    // Initialize services display
+    showCurrentNicheServices();
     
     // Initialize prompt preview
     updatePromptPreview();
