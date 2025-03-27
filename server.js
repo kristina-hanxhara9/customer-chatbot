@@ -1,79 +1,67 @@
-// server.js
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const dotenv = require('dotenv');
 
-// Import routes
-const configRoutes = require('./routes/config');
-const chatRoutes = require('./routes/chat');
-const testRoutes = require('./routes/test'); // Add this line
+// Load environment variables
+dotenv.config();
 
-// Initialize app
+console.log('MONGODB_URI from env:', process.env.MONGODB_URI ? 'defined' : 'undefined');
+console.log('GEMINI_API_KEY from env:', process.env.GEMINI_API_KEY ? 'defined' : 'undefined');
+
+// Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS.split(',') 
-    : '*'
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
 }));
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'transformai/public')));
 
-// API Routes
-app.use('/api/config', configRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/test', testRoutes); // Add this line
+// Import routes
+const chatbotRoutes = require('./transformai/routes/chatbotRoutes');
+const conversationRoutes = require('./transformai/routes/conversationRoutes');
 
-// Serve widget.js
-app.get('/widget.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'widget.js'));
-});
-
-// Catch-all route for SPA
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
-  });
+// Basic route for testing
+app.get('/', (req, res) => {
+  res.send('TransformAI API is running');
 });
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  console.log('MongoDB connected');
-  
-  // Start server
-  app.listen(PORT, () => {
-    console.log(`TransformAI server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log('MongoDB connected successfully');
+    
+    // Only set up routes after DB connection is established
+    // Routes
+    app.use('/api/chatbots', chatbotRoutes);
+    app.use('/api/conversations', conversationRoutes);
+    
+    // Serve widget.js
+    app.get('/widget.js', (req, res) => {
+      res.sendFile(path.join(__dirname, 'transformai', 'public', 'widget.js'));
+    });
+    
+    // Start server after successful DB connection
+    app.listen(PORT, () => {
+      console.log(`TransformAI server running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1); // Exit with error code
   });
-})
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  process.exit(1);
-});
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    success: false,
+    message: err.message || 'Something went wrong!'
+  });
 });
