@@ -1,3 +1,4 @@
+// Import your Chatbot and Conversation models
 const Chatbot = require('../models/Chatbot');
 const Conversation = require('../models/Conversation');
 
@@ -109,26 +110,33 @@ exports.getChatbot = async (req, res) => {
       });
     }
     
-    // Get basic statistics
-    const totalConversations = await Conversation.countDocuments({ chatbotId: chatbot._id });
-    const latestConversation = await Conversation.findOne({ chatbotId: chatbot._id })
-      .sort({ lastActivityAt: -1 })
-      .limit(1);
-    
-    // Update statistics
-    chatbot.stats.totalConversations = totalConversations;
-    if (latestConversation) {
-      chatbot.stats.lastActiveDate = latestConversation.lastActivityAt;
-      
-      // Count total messages
-      let totalMessages = 0;
-      const conversations = await Conversation.find({ chatbotId: chatbot._id });
-      conversations.forEach(convo => {
-        totalMessages += convo.messages.filter(msg => msg.role !== 'system').length;
-      });
-      
-      chatbot.stats.totalMessages = totalMessages;
-      await chatbot.save();
+    // Get basic statistics if MongoDB is available
+    if (chatbot.isNew === undefined) {
+      try {
+        const totalConversations = await Conversation.countDocuments({ chatbotId: chatbot._id });
+        const latestConversation = await Conversation.findOne({ chatbotId: chatbot._id })
+          .sort({ lastActivityAt: -1 })
+          .limit(1);
+        
+        // Update statistics
+        chatbot.stats.totalConversations = totalConversations;
+        if (latestConversation) {
+          chatbot.stats.lastActiveDate = latestConversation.lastActivityAt;
+          
+          // Count total messages
+          let totalMessages = 0;
+          const conversations = await Conversation.find({ chatbotId: chatbot._id });
+          conversations.forEach(convo => {
+            totalMessages += convo.messages.filter(msg => msg.role !== 'system').length;
+          });
+          
+          chatbot.stats.totalMessages = totalMessages;
+          await chatbot.save();
+        }
+      } catch (error) {
+        console.error('Error updating chatbot statistics:', error);
+        // Continue anyway, stats are nice but not critical
+      }
     }
     
     res.status(200).json({
@@ -218,7 +226,12 @@ exports.deleteChatbot = async (req, res) => {
     }
     
     // Delete all associated conversations
-    await Conversation.deleteMany({ chatbotId: chatbot._id });
+    try {
+      await Conversation.deleteMany({ chatbotId: chatbot._id });
+    } catch (error) {
+      console.error('Error deleting associated conversations:', error);
+      // Continue anyway, we still want to delete the chatbot
+    }
     
     // Delete the chatbot
     await Chatbot.findByIdAndDelete(req.params.id);

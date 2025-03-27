@@ -1,15 +1,8 @@
 const { v4: uuidv4 } = require('uuid');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Chatbot = require('../models/Chatbot');
 const Conversation = require('../models/Conversation');
+const geminiAI = require('../gemini');
 require('dotenv').config();
-
-// Get API key and model name directly from environment
-const apiKey = process.env.GEMINI_API_KEY;
-const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
-
-// Initialize Gemini client directly
-const genAI = new GoogleGenerativeAI(apiKey);
 
 // Enable debugging
 const DEBUG = true;
@@ -30,84 +23,13 @@ function log(message, object = null) {
 }
 
 /**
- * Generate response using direct Gemini API call
- * @param {string} message - User message
- * @param {object} chatbot - Chatbot object with business details
- * @returns {Promise<string>} Response from Gemini
- */
-async function generateDirectResponse(message, chatbot) {
-  try {
-    log('Generating direct response for message:', message);
-    
-    // Create generation config
-    const generationConfig = {
-      temperature: 0.7,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 1024
-    };
-    
-    // Get model instance
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      generationConfig
-    });
-    
-    // Create a direct prompt with all business context
-    const businessContext = `
-Business name: ${chatbot.businessName}
-Business type: ${chatbot.industry} 
-Services: ${chatbot.services.join(', ')}
-Business hours: ${chatbot.businessHours}
-Business description: ${chatbot.businessDescription || 'Not provided'}
-`;
-
-    // Create a detailed prompt
-    const prompt = `
-You are an AI assistant for a ${chatbot.industry} business called ${chatbot.businessName}.
-${businessContext}
-
-USER QUERY: "${message}"
-
-IMPORTANT INSTRUCTIONS:
-1. Respond directly to the user's query.
-2. Include specific information about ${chatbot.businessName} in your response.
-3. Reference the services or business hours if relevant.
-4. DO NOT respond with the generic phrase "Thank you for your message. How else can I assist you today?"
-5. Be helpful, conversational, and natural.
-
-YOUR SPECIFIC RESPONSE:`;
-    
-    log('Direct prompt:', prompt);
-    
-    // Generate content
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
-    
-    log('Received response from Gemini API:', response);
-    
-    // Check if we still got a generic response
-    if (response === "Thank you for your message. How else can I assist you today?" ||
-        response.trim() === '') {
-      log('WARNING: Still got a generic response, using manual fallback');
-      return manualFallbackResponse(message, chatbot);
-    }
-    
-    return response;
-  } catch (error) {
-    log('ERROR generating direct response:', error.message);
-    return manualFallbackResponse(message, chatbot);
-  }
-}
-
-/**
- * Create a manual fallback response if all API attempts fail
+ * Generate a manual fallback response if all API attempts fail
  * @param {string} message - User message
  * @param {object} chatbot - Chatbot object
  * @returns {string} Manually crafted response
  */
-function manualFallbackResponse(message, chatbot) {
-  log('Creating manual fallback response');
+function createFallbackResponse(message, chatbot) {
+  log('Creating fallback response');
   
   // Extract common keywords from the message
   const lowerMessage = message.toLowerCase();
@@ -147,7 +69,7 @@ function manualFallbackResponse(message, chatbot) {
 
 /**
  * Process a new message and get AI response
- * @route POST /api/conversations/:chatbotId/messages
+ * @route POST /api/:chatbotId/messages
  */
 exports.processMessage = async (req, res) => {
   try {
@@ -224,9 +146,51 @@ exports.processMessage = async (req, res) => {
     await conversation.save();
     log('Saved conversation with new user message');
     
-    // Generate AI response DIRECTLY using Gemini API - bypassing complex message formatting
-    log('Generating AI response directly...');
-    const aiResponse = await generateDirectResponse(message, chatbot);
+    // Generate AI response using history
+    log('Generating AI response...');
+    let aiResponse;
+    
+    try {
+      // Try using conversation history for context
+      aiResponse = await geminiAI.generateFromHistory(conversation.messages);
+      log('Generated response using conversation history');
+    } catch (error) {
+      log('Error with conversation history, falling back to direct prompt:', error.message);
+      
+      // Create a direct prompt with all business context
+      const businessContext = `
+Business name: ${chatbot.businessName}
+Business type: ${chatbot.industry} 
+Services: ${chatbot.services.join(', ')}
+Business hours: ${chatbot.businessHours}
+Business description: ${chatbot.businessDescription || 'Not provided'}
+`;
+
+      // Create a detailed prompt
+      const prompt = `
+You are an AI assistant for a ${chatbot.industry} business called ${chatbot.businessName}.
+${businessContext}
+
+USER QUERY: "${message}"
+
+IMPORTANT INSTRUCTIONS:
+1. Respond directly to the user's query.
+2. Include specific information about ${chatbot.businessName} in your response.
+3. Reference the services or business hours if relevant.
+4. DO NOT respond with the generic phrase "Thank you for your message. How else can I assist you today?"
+5. Be helpful, conversational, and natural.
+
+YOUR SPECIFIC RESPONSE:`;
+      
+      try {
+        aiResponse = await geminiAI.generateResponse(prompt);
+        log('Generated response using direct prompt');
+      } catch (secondError) {
+        log('Error with direct prompt, using fallback response:', secondError.message);
+        aiResponse = createFallbackResponse(message, chatbot);
+      }
+    }
+    
     log('AI Response:', aiResponse);
     
     // Add AI response to conversation
@@ -236,10 +200,15 @@ exports.processMessage = async (req, res) => {
     log('Saved conversation with AI response');
     
     // Update chatbot stats
-    chatbot.stats.lastActiveDate = Date.now();
-    chatbot.stats.totalConversations = await Conversation.countDocuments({ chatbotId });
-    await chatbot.save();
-    log('Updated chatbot stats');
+    try {
+      chatbot.stats.lastActiveDate = Date.now();
+      chatbot.stats.totalConversations = await Conversation.countDocuments({ chatbotId });
+      await chatbot.save();
+      log('Updated chatbot stats');
+    } catch (error) {
+      log('Error updating chatbot stats:', error.message);
+      // Continue anyway - stats are nice but not critical
+    }
     
     // Return response
     res.status(200).json({
@@ -259,7 +228,10 @@ exports.processMessage = async (req, res) => {
   }
 };
 
-// Get conversation history
+/**
+ * Get conversation history
+ * @route GET /api/:chatbotId/conversations
+ */
 exports.getConversations = async (req, res) => {
   try {
     const { chatbotId } = req.params;
@@ -318,7 +290,10 @@ exports.getConversations = async (req, res) => {
   }
 };
 
-// Get a single conversation with messages
+/**
+ * Get a single conversation with messages
+ * @route GET /api/:chatbotId/conversations/:conversationId
+ */
 exports.getConversation = async (req, res) => {
   try {
     const { chatbotId, conversationId } = req.params;
@@ -366,7 +341,10 @@ exports.getConversation = async (req, res) => {
   }
 };
 
-// Submit feedback for a conversation
+/**
+ * Submit feedback for a conversation
+ * @route POST /api/:chatbotId/conversations/:conversationId/feedback
+ */
 exports.submitFeedback = async (req, res) => {
   try {
     const { chatbotId, conversationId } = req.params;
@@ -415,7 +393,10 @@ exports.submitFeedback = async (req, res) => {
   }
 };
 
-// Continue an existing conversation
+/**
+ * Get or create a conversation
+ * @route GET /api/:chatbotId/conversation
+ */
 exports.getOrCreateConversation = async (req, res) => {
   try {
     log('Get or create conversation');

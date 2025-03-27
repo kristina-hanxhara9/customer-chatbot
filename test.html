@@ -1,61 +1,111 @@
-// HTML test page similar to simple-server.js
-app.get('/test', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>TransformAI Chatbot Test</title>
-      <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .chat-container { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
-        .message { margin-bottom: 10px; padding: 10px; border-radius: 8px; }
-        .user { background-color: #e6f7ff; text-align: right; }
-        .bot { background-color: #f2f2f2; }
-        textarea { width: 100%; padding: 10px; margin-bottom: 10px; }
-        button { padding: 10px 20px; background-color: #4a6cf7; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .settings { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; }
-        .settings input, .settings select { width: 100%; padding: 8px; margin-bottom: 10px; }
-        h3 { margin-top: 15px; }
-      </style>
-    </head>
-    <body>
-      <h1>TransformAI Chatbot Test</h1>
-      <p>This page tests the chatbot using the complete server implementation.</p>
-      
-      <div class="settings">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TransformAI - API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .user {
+            background-color: #e6f7ff;
+            text-align: right;
+        }
+        .bot {
+            background-color: #f2f2f2;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        textarea {
+            flex: 1;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4a6cf7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .settings {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        .settings input, .settings select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        h3 {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TransformAI API Test</h1>
+    <p>This simple interface tests the connection to your TransformAI server API.</p>
+    
+    <div class="settings">
         <h3>Business Settings</h3>
         <input type="text" id="businessId" placeholder="Business ID" value="test-business-1">
         <input type="text" id="userId" placeholder="User ID" value="test-user-1">
         <input type="text" id="businessName" placeholder="Business Name" value="Smile Bright Dental">
         <select id="businessType">
-          <option value="dental practice">Dental Practice</option>
-          <option value="real estate agency">Real Estate Agency</option>
-          <option value="restaurant">Restaurant</option>
-          <option value="fitness studio">Fitness Studio</option>
+            <option value="dental practice">Dental Practice</option>
+            <option value="real estate agency">Real Estate Agency</option>
+            <option value="restaurant">Restaurant</option>
+            <option value="fitness studio">Fitness Studio</option>
         </select>
         <input type="text" id="services" placeholder="Services (comma separated)" value="Regular check-ups, Teeth cleaning, Cosmetic dentistry">
         <input type="text" id="hours" placeholder="Business Hours" value="Monday-Friday: 9:00 AM - 5:00 PM">
-      </div>
-      
-      <div class="chat-container" id="chat">
+    </div>
+    
+    <div class="chat-container" id="chat-container">
         <div class="message bot">Hi there! How can I help you today?</div>
-      </div>
-      
-      <div style="margin-top: 20px;">
-        <textarea id="message" rows="4" placeholder="Type your message here..."></textarea>
-        <button id="send">Send Message</button>
-      </div>
-      
-      <script>
+    </div>
+    
+    <div class="input-container">
+        <textarea id="message-input" rows="2" placeholder="Type your message here..."></textarea>
+        <button id="send-button">Send</button>
+    </div>
+    
+    <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const chatContainer = document.getElementById('chat');
-            const messageInput = document.getElementById('message');
-            const sendButton = document.getElementById('send');
+            const chatContainer = document.getElementById('chat-container');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
             
             // Function to add a message to the chat
             function addMessage(content, isUser = false) {
                 const messageDiv = document.createElement('div');
-                messageDiv.className = \`message \${isUser ? 'user' : 'bot'}\`;
+                messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
                 messageDiv.textContent = content;
                 chatContainer.appendChild(messageDiv);
                 
@@ -149,8 +199,6 @@ app.get('/test', (req, res) => {
                 }
             });
         });
-      </script>
-    </body>
-    </html>
-  `);
-});
+    </script>
+</body>
+</html>

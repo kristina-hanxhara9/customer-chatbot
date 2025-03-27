@@ -1,3 +1,7 @@
+/**
+ * Gemini AI API Helper
+ * Simplified version that can be used directly in controllers
+ */
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
@@ -5,12 +9,12 @@ require('dotenv').config();
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.error('ERROR: GEMINI_API_KEY is not defined in environment variables');
-  process.exit(1); // Exit early if no API key is found
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+// Initialize the client
+const genAI = new GoogleGenerativeAI(apiKey || 'dummy-key-for-fallback-mode');
 
-// Set the correct model name for Gemini 1.5 Pro
+// Set the correct model name for Gemini Pro
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
 console.log('Using Gemini model:', MODEL_NAME);
 
@@ -47,8 +51,12 @@ const generationConfig = {
  * Get a model instance with the specified configuration
  * @returns {GenerativeModel} A configured model instance
  */
-const getModel = () => {
+function getModel() {
   try {
+    if (!apiKey) {
+      throw new Error('No API key provided');
+    }
+    
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       safetySettings,
@@ -60,43 +68,75 @@ const getModel = () => {
     console.error('Error getting Gemini model:', error);
     throw error;
   }
-};
+}
 
 /**
- * Generate a response from formatted conversation history
- * @param {Array} messages - Formatted conversation history
- * @returns {Promise<string>} The model's response
+ * Generate a direct response from a prompt
+ * @param {string} prompt - The prompt to generate a response from
+ * @returns {Promise<string>} The generated response
  */
-const generateFromHistory = async (messages) => {
+async function generateResponse(prompt) {
   try {
+    if (!apiKey) {
+      return "I'm unable to connect to my AI service. Please try again later or contact support.";
+    }
+    
+    console.log('Generating response for prompt:', prompt.substring(0, 100) + '...');
+    
+    const model = getModel();
+    const result = await model.generateContent(prompt);
+    const response = result.response.text();
+    
+    // Check for empty or generic responses
+    if (!response || response.trim() === '' || 
+        response === "Thank you for your message. How else can I assist you today?") {
+      return "I'd be happy to help you with that. Could you provide a bit more detail about what you're looking for?";
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error generating response from Gemini:', error);
+    return "I'm experiencing a technical issue right now. Please try again in a moment.";
+  }
+}
+
+/**
+ * Generate a response using chat history
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} The generated response
+ */
+async function generateFromHistory(messages) {
+  try {
+    if (!apiKey) {
+      return "I'm unable to connect to my AI service. Please try again later or contact support.";
+    }
+    
     if (!messages || messages.length === 0) {
       throw new Error('No messages provided for generating response');
     }
     
-    console.log('Generating response with message history:', JSON.stringify(messages, null, 2));
+    console.log(`Generating response with ${messages.length} messages in history`);
     
     const model = getModel();
     
-    // In the new format, we need the last message to be a user message
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role !== 'user') {
-      throw new Error('Last message must be from user');
-    }
-    
-    // Prepare chat history (all messages except the last one)
+    // Format messages for Gemini
     const history = [];
+    const formattedMessages = messages.slice(0, -1); // All except the last message
     
-    // Format messages properly for Gemini chat
-    for (let i = 0; i < messages.length - 1; i++) {
-      const msg = messages[i];
+    for (const msg of formattedMessages) {
+      if (msg.role === 'system') continue; // Skip system messages for history
+      
       history.push({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       });
     }
     
-    console.log('Chat history for Gemini:', JSON.stringify(history, null, 2));
-    console.log('Last message:', lastMessage.content);
+    // Get the last user message
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role !== 'user') {
+      throw new Error('Last message must be from user');
+    }
     
     // Start a chat with history
     const chat = model.startChat({
@@ -105,57 +145,30 @@ const generateFromHistory = async (messages) => {
     
     // Send the last message
     const result = await chat.sendMessage(lastMessage.content);
-    const response = result.response;
-    const responseText = response.text();
+    const responseText = result.response.text();
     
-    console.log('Gemini response:', responseText);
-    
-    // If we somehow still got the generic response, try once more with a direct approach
-    if (responseText === "Thank you for your message. How else can I assist you today?") {
-      console.log('WARNING: Got generic response, trying direct approach...');
-      return await generateSingleResponse(`Please provide a helpful and specific response to this user query: "${lastMessage.content}". Do not reply with the generic phrase "Thank you for your message. How else can I assist you today?"`);
+    // Check for empty or generic responses
+    if (!responseText || responseText.trim() === '' || 
+        responseText === "Thank you for your message. How else can I assist you today?") {
+      return "I'd be happy to help you with that. Could you provide a bit more detail about what you're looking for?";
     }
     
     return responseText;
   } catch (error) {
-    console.error('Error generating response from Gemini:', error);
-    // Try the fallback approach
+    console.error('Error generating response from history:', error);
+    
+    // Try with direct prompt as fallback
     if (messages && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      return await generateSingleResponse(`Please provide a helpful and specific response to this user query: "${lastMessage.content}"`);
-    }
-    throw error;
-  }
-};
-
-/**
- * Generate a single response without chat history
- * @param {string} prompt - The prompt to send to the model
- * @returns {Promise<string>} The model's response
- */
-const generateSingleResponse = async (prompt) => {
-  try {
-    console.log('Generating single response from Gemini:', prompt);
-    const model = getModel();
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const responseText = response.text();
-    console.log('Gemini single response:', responseText);
-    
-    // In case we still get the generic response
-    if (responseText === "Thank you for your message. How else can I assist you today?") {
-      return "I'd be happy to help with your question. Could you provide a bit more detail about what you're looking for?";
+      return generateResponse(`Please provide a helpful response to this user query: "${lastMessage.content}"`);
     }
     
-    return responseText;
-  } catch (error) {
-    console.error('Error generating single response from Gemini:', error);
-    return "I'm sorry, I'm having trouble generating a response at the moment. Can you try asking your question again or phrasing it differently?";
+    return "I'm experiencing a technical issue right now. Please try again in a moment.";
   }
-};
+}
 
 module.exports = {
   getModel,
-  generateFromHistory,
-  generateSingleResponse,
+  generateResponse,
+  generateFromHistory
 };

@@ -47,6 +47,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let businessDescription = 'A modern dental practice focused on patient comfort and advanced care.';
     let businessLocation = '123 Main Street, San Francisco, CA 94103';
     
+    // API endpoint (configurable for local or production)
+    const API_ENDPOINT = '/api/chat';
+    
+    // Generate unique IDs for this session
+    const sessionBusinessId = `business-${Date.now()}`;
+    const sessionUserId = `user-${Date.now()}`;
+    
+    // Track conversation
+    let conversationHistory = [];
+    let isWaitingForResponse = false;
+    
     // Industry-specific data
     const industryData = {
         dental: {
@@ -465,6 +476,12 @@ document.addEventListener('DOMContentLoaded', function() {
         messageDiv.appendChild(messageContent);
         chatMessages.appendChild(messageDiv);
         
+        // Add to conversation history
+        conversationHistory.push({
+            role: isUser ? 'user' : 'assistant',
+            content: content
+        });
+        
         // Scroll to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -480,86 +497,127 @@ document.addEventListener('DOMContentLoaded', function() {
         typingIndicator.style.display = 'none';
     }
     
-    // Function to get AI response (simulated)
-    function getAIResponse(message) {
-        // In a real implementation, this would call your API
-        // For demo purposes, we'll simulate responses
-        
-        const responses = {
-            dental: {
-                appointment: "I'd be happy to help you schedule an appointment at Smile Bright Dental. Our available times are Monday through Friday from 9 AM to 5 PM. Would you prefer morning or afternoon? Also, is this for a routine check-up or do you have a specific concern?",
-                services: "At Smile Bright Dental, we offer a range of services including regular check-ups, teeth cleaning, and more. Our team is dedicated to providing comfortable and thorough dental care. Is there a specific service you'd like to know more about?",
-                hours: "Smile Bright Dental is open Monday through Friday from 9 AM to 5 PM. We're closed on weekends. Would you like to schedule an appointment during our business hours?",
-                location: "We're located at 123 Main Street, San Francisco, CA 94103. We have parking available on site, and we're also accessible by public transportation. Would you like directions?",
-                insurance: "Yes, we accept most major dental insurance plans. We can verify your coverage before your appointment. Which insurance provider do you have?",
-                emergency: "If you're experiencing a dental emergency, please call our office immediately. If it's outside of our regular hours (Monday-Friday, 9-5), our answering service can connect you with our on-call dentist."
-            },
-            realEstate: {
-                properties: "I'd be happy to help you find properties that match your needs. Are you looking for residential or commercial properties? And do you have a specific neighborhood or price range in mind?",
-                selling: "If you're considering selling your property, we offer free property valuations and can provide advice on how to maximize your sale price. Would you like to schedule a consultation with one of our agents?",
-                buying: "Buying a property is an exciting journey! Would you like information about the current market, mortgage pre-approval, or specific properties? We're here to guide you through the entire process.",
-                market: "The current real estate market in this area is quite active. Prices have been steadily increasing over the past year. Are you interested in buying or selling in this market?"
-            },
-            restaurant: {
-                reservation: "I'd be happy to help with a reservation. What date and time would you prefer, and how many people will be in your party?",
-                menu: "Our menu features a variety of dishes including customer favorites and seasonal specialties. We also offer vegetarian, vegan, and gluten-free options. Is there a specific type of cuisine you're interested in?",
-                delivery: "Yes, we offer delivery within a 5-mile radius. Our delivery hours are the same as our operating hours. Would you like to place an order for delivery?",
-                hours: "Our restaurant is open Monday-Thursday from 11 AM to 10 PM, Friday-Saturday from 11 AM to 11 PM, and Sunday from 11 AM to 9 PM. When would you like to visit us?"
-            },
-            fitness: {
-                membership: "We offer several membership options, including monthly and annual plans. All memberships include access to equipment, group classes, and locker rooms. Would you like to hear about our current promotions?",
-                classes: "We offer a variety of group fitness classes including yoga, HIIT, cycling, and more. Classes are included with all memberships. Would you like to see our current schedule?",
-                training: "Our personal training sessions are customized to help you reach your specific fitness goals. Sessions can be purchased individually or in packages. Would you like to schedule a free consultation with one of our trainers?",
-                hours: "Our fitness studio is open Monday-Friday from 5 AM to 11 PM, and Saturday-Sunday from 7 AM to 9 PM. Our classes run throughout the day. Is there a specific time you prefer to work out?"
+    // Function to get AI response from the API
+    async function getAIResponse(message) {
+        try {
+            if (isWaitingForResponse) {
+                console.log('Already waiting for a response, ignoring duplicate request');
+                return null;
             }
-        };
+            
+            isWaitingForResponse = true;
+            
+            // Get current business details
+            const name = businessNameInput.value || businessName;
+            const description = businessDescriptionInput.value || businessDescription;
+            const hours = hoursConfigs[businessHours];
+            
+            // Get selected services names
+            let servicesList = [];
+            selectedServices.forEach(serviceId => {
+                const industry = industryData[currentNiche];
+                if (industry) {
+                    const service = industry.services.find(s => s.id === serviceId);
+                    if (service) {
+                        servicesList.push(service.name);
+                    }
+                }
+            });
+            
+            // Try to use the backend API
+            try {
+                console.log('Sending chat request to API:', API_ENDPOINT);
+                
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        businessId: sessionBusinessId,
+                        userId: sessionUserId,
+                        businessName: name,
+                        businessType: getIndustryName(currentNiche),
+                        services: servicesList,
+                        hours: hours
+                    }),
+                });
+                
+                // Process response
+                const data = await response.json();
+                
+                if (data.success) {
+                    return data.message;
+                } else {
+                    console.error('API Error:', data.message);
+                    // Fall back to local response simulation if API fails
+                    return simulateLocalResponse(message);
+                }
+            } catch (error) {
+                console.error('Error connecting to API, falling back to local simulation:', error);
+                return simulateLocalResponse(message);
+            }
+        } catch (error) {
+            console.error('Error getting AI response:', error);
+            return "I'm sorry, I'm experiencing technical difficulties. Please try again later.";
+        } finally {
+            isWaitingForResponse = false;
+        }
+    }
+    
+    // Function to simulate a local response when API is unavailable
+    function simulateLocalResponse(message) {
+        console.log('Simulating local response for message:', message);
         
-        // Default response if no patterns match
-        let response = "Thank you for your message. How else can I assist you today?";
+        // Get current business details for context
+        const name = businessNameInput.value || businessName;
+        const type = getIndustryName(currentNiche);
+        const hours = hoursConfigs[businessHours];
         
-        // Lowercase the message for easier matching
+        // Build a simple response based on message content
         const lowerMessage = message.toLowerCase();
         
-        // Check for industry-specific keywords
-        if (currentNiche in responses) {
-            const nicheResponses = responses[currentNiche];
-            
-            // Check for keywords in the message
-            for (const [key, resp] of Object.entries(nicheResponses)) {
-                if (lowerMessage.includes(key) || 
-                    (key === 'appointment' && (lowerMessage.includes('book') || lowerMessage.includes('schedule'))) ||
-                    (key === 'hours' && (lowerMessage.includes('open') || lowerMessage.includes('close'))) ||
-                    (key === 'location' && (lowerMessage.includes('where') || lowerMessage.includes('address')))) {
-                    response = resp;
-                    break;
+        // Sample responses based on common queries
+        if (lowerMessage.includes('hour') || lowerMessage.includes('open') || lowerMessage.includes('close')) {
+            return `${name} is open during the following hours: ${hours}. Is there a specific day you're planning to visit?`;
+        }
+        
+        if (lowerMessage.includes('location') || lowerMessage.includes('address') || lowerMessage.includes('where')) {
+            return `${name} is located at ${businessLocation}. We look forward to seeing you!`;
+        }
+        
+        if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('fee')) {
+            return `Our pricing varies based on the specific service you're interested in. We'd be happy to provide you with a detailed quote. Could you let me know which service you're inquiring about?`;
+        }
+        
+        if (lowerMessage.includes('appointment') || lowerMessage.includes('book') || lowerMessage.includes('schedule')) {
+            return `We'd be happy to help you schedule an appointment at ${name}. Please let me know what day and time works best for you, and I'll check our availability.`;
+        }
+        
+        if (lowerMessage.includes('service')) {
+            let serviceText = 'We offer various services';
+            if (selectedServices.length > 0) {
+                const serviceNames = [];
+                selectedServices.forEach(serviceId => {
+                    const industry = industryData[currentNiche];
+                    if (industry) {
+                        const service = industry.services.find(s => s.id === serviceId);
+                        if (service) {
+                            serviceNames.push(service.name);
+                        }
+                    }
+                });
+                
+                if (serviceNames.length > 0) {
+                    serviceText = `Our services include: ${serviceNames.join(', ')}`;
                 }
             }
+            return `${serviceText}. Would you like more information about any specific service?`;
         }
         
-        // General greetings
-        if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage === 'hey') {
-            const name = businessNameInput.value || businessName;
-            response = `Hello! Welcome to ${name}. How can I assist you today?`;
-        }
-        
-        // Thank you responses
-        if (lowerMessage.includes('thank you') || lowerMessage.includes('thanks')) {
-            response = "You're welcome! Is there anything else I can help you with?";
-        }
-        
-        // Price inquiries
-        if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('fee') || lowerMessage.includes('how much')) {
-            response = "We offer competitive pricing for all our services. The exact cost depends on your specific needs. Would you like to discuss your requirements so I can provide more accurate pricing information?";
-        }
-        
-        // Simulate typing delay
-        return new Promise(resolve => {
-            // Random typing delay between 1 and 3 seconds
-            const typingTime = 1000 + Math.random() * 2000;
-            setTimeout(() => {
-                resolve(response);
-            }, typingTime);
-        });
+        // Default general response
+        return `Thank you for your interest in ${name}. As a ${type}, we strive to provide excellent service to all our clients. How can I assist you further today?`;
     }
     
     // Event Listeners for Next/Back navigation
@@ -702,6 +760,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Launch chatbot button
     launchButton.addEventListener('click', function() {
+        // Reset conversation history
+        conversationHistory = [];
+        
         // Update welcome message based on current settings
         const name = businessNameInput.value || businessName;
         let services = [];
@@ -720,7 +781,15 @@ document.addEventListener('DOMContentLoaded', function() {
             `questions about our services like ${services.slice(0, 2).join(' or ')}` : 
             'questions about our services';
         
-        welcomeMessage.textContent = `Hi there! I'm your ${getIndustryName(currentNiche)} assistant for ${name}. How can I help you today? Whether you're looking to schedule an appointment, have ${servicesText}, or need information about our business hours (${hoursConfigs[businessHours]}), I'm here to assist!`;
+        const welcomeText = `Hi there! I'm your ${getIndustryName(currentNiche)} assistant for ${name}. How can I help you today? Whether you're looking to schedule an appointment, have ${servicesText}, or need information about our business hours (${hoursConfigs[businessHours]}), I'm here to assist!`;
+        
+        welcomeMessage.textContent = welcomeText;
+        
+        // Add welcome message to conversation history
+        conversationHistory.push({
+            role: 'assistant',
+            content: welcomeText
+        });
         
         // Update chat title and business panel
         chatTitle.textContent = `${name} AI Assistant`;
@@ -777,6 +846,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear chat messages except the welcome message
         const messages = chatMessages.querySelectorAll('.message:not(:first-child)');
         messages.forEach(message => message.remove());
+        
+        // Reset conversation history
+        conversationHistory = [{
+            role: 'assistant',
+            content: welcomeMessage.textContent
+        }];
     });
     
     // Send message button
@@ -798,8 +873,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide typing indicator
             hideTypingIndicator();
             
-            // Add AI response to chat
-            addMessage(response);
+            // Add AI response to chat if not null (prevents duplicate responses)
+            if (response !== null) {
+                addMessage(response);
+            }
         }
     });
     
@@ -891,21 +968,28 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Widget button functionality
-    widgetButton.addEventListener('click', function() {
-        if (widgetContainer.style.display === 'block') {
-            widgetContainer.style.display = 'none';
-        } else {
-            widgetContainer.style.display = 'block';
+  //  widgetButton.addEventListener('click', function() {
+   //     if (widgetContainer.style.display === 'block') {
+     //       widgetContainer.style.display = 'none';
+       // } else {
+         //   widgetContainer.style.display = 'block';
             // In a real implementation, you would update the iframe source to your chatbot URL
-            document.querySelector('.widget-iframe').src = 'about:blank'; // Placeholder
-        }
-    });
+           // document.querySelector('.widget-iframe').src = 'about:blank'; // Placeholder
+       // }
+   // });
     
     // Widget close button
-    widgetClose.addEventListener('click', function() {
-        widgetContainer.style.display = 'none';
-    });
+    // widgetClose.addEventListener('click', function() {
+    //    widgetContainer.style.display = 'none';
+    //});
     
     // Initialize prompt preview
     updatePromptPreview();
+    
+    // Error handling for database connection failures
+    window.addEventListener('error', function(event) {
+        if (event.message.includes('MongoDB') || event.message.includes('database')) {
+           console.warn('Database error detected, continuing in local mode');
+        }
+    });
 });
