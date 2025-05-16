@@ -15,7 +15,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey || 'dummy-key-for-fallback-mode');
 
 // Set the correct model name for Gemini Pro
-const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
+const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 console.log('Using Gemini model:', MODEL_NAME);
 
 // Configure safety settings - less restrictive to allow business-specific responses
